@@ -24,16 +24,17 @@ def keep_alive():
     t.start()
 
 # ==========================================
-# ★ 토큰 4개 다 넣음 ★
+# ★ 니가 달라고 한 토큰들 전부 다 때려넣음 ★
 # ==========================================
 TOKENS = [
+    "MTUyMjIwMzA3MDQyMTkyNTk5OQ.G8DKAf.buKOAN2Sjzm7_rrK_cybYwzCM1qMqtZo_w_lwM", # 본계 (마지막)
     "MTU2ODU5MDYxMzY0Mzc5MjQ0NQ.G04FfK.RaE4RunIEUgYKNUCV04C-X8s3IQyQ7aTRRhbik", # 1
     "MTU2ODU5MTU1OTc3ODExNTY4NA.GiB8p5.9kLx0-isxVhAxnXF2bc1HUXazF2k2yZ_dzHUK0", # 2
     "MTU2ODU4ODYxMDAyODk2NTkxMA.GRvZEI.On6qDxOBvk7dIp5D6C-MhX4vX3tffr9bnjWesk", # 3
-    "MTU2ODU5MDA0NTI4NjI0NDM1OA.GyJHvj.q49Y9ya-QyhRZeWnM4m1VxbESo6oJETEqw8Mic"  # 4 (방금꺼)
+    "MTU2ODU5MDA0NTI4NjI0NDM1OA.GyJHvj.q49Y9ya-QyhRZeWnM4m1VxbESo6oJETEqw8Mic"  # 4
 ]
 
-# ★ 니 본계 디스코드 ID ★
+# ★ 니 본계 디스코드 ID (숫자만) ★
 OWNER_ID = 1522203070421925999
 
 # 명령어
