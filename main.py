@@ -46,7 +46,7 @@ HELP_TRIGGER = "!기능"
 SPAM_TRIGGER = "!spam"
 MENTION_TRIGGER = "!갠디" 
 DOBAE_TRIGGER = "!도배"   
-PING_TRIGGER = "!핑" # 핑 명령어 추가
+PING_TRIGGER = "!핑" 
 
 # 일반 도배용 단어장
 raw_words = "니애미,창년,개보지,말보지,저능아,열등종자,개새끼,고아,시발,시발련,고아련,종자,장애,랑애,농아,븅신,병신,씨발,애미,애비,죽은,새끼,머저리,창녀,청년,느금마,느그애비,느그애미,니애비,씹보지,말랑보지,말보지,창년보지,죽은보지,헐렁보지,보지,자폐아,거지,좆거지,개거지,장애보지,개벌래보지"
@@ -82,6 +82,7 @@ class SpamClient(discord.Client):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_spamming = False
+        self.is_pinging = False # 핑 반복용 변수
         self.spam_content = ""
         self.spam_delay = 1.0 
         self.spam_mode = "normal"
@@ -107,27 +108,33 @@ class SpamClient(discord.Client):
 
         # 1. 전체 중지 (!STOP)
         if message.content == STOP_TRIGGER:
-            if self.is_spamming:
-                self.is_spamming = False
-                await message.channel.send("STOP")
+            self.is_spamming = False
+            self.is_pinging = False
+            await message.channel.send("STOP")
             return
 
-        # 2. 핑 (커스텀 텍스트 보냈다가 삭제)
+        # 2. 핑 반복 (!핑 텍스트)
         if message.content.startswith(PING_TRIGGER):
             ping_text = message.content[len(PING_TRIGGER):].strip()
             if not ping_text:
                 ping_text = "핑!"
             
-            try:
-                # 텍스트 전송
-                sent_msg = await message.channel.send(ping_text)
-                # 1초 뒤 삭제
-                await asyncio.sleep(1.0)
-                await sent_msg.delete()
-            except discord.errors.Forbidden:
-                await message.channel.send("메시지를 삭제할 권한이 없습니다.")
-            except Exception:
-                pass
+            if self.is_pinging:
+                return # 이미 돌고 있으면 무시
+            
+            self.is_pinging = True
+            
+            while self.is_pinging:
+                try:
+                    sent_msg = await message.channel.send(ping_text)
+                    await asyncio.sleep(0.5) # 0.5초 보이고
+                    await sent_msg.delete()   # 삭제
+                    await asyncio.sleep(0.5) # 0.5초 대기 후 다시 (총 1초 간격)
+                except discord.errors.Forbidden:
+                    await message.channel.send("메시지를 삭제할 권한이 없습니다.")
+                    self.is_pinging = False
+                except Exception:
+                    await asyncio.sleep(1)
             return
 
         # 3. 기능 목록
@@ -137,13 +144,13 @@ class SpamClient(discord.Client):
                 f"`{START_TRIGGER}` : 일반 도배 시작\n"
                 f"`{STOP_TRIGGER}` : 도배 중지\n"
                 f"`{SETTINGS_TRIGGER}` : 현재 속도 확인\n"
-                f"`{SPEED_TRIGGER} [숫자]` : 속도 변경 (예: !스피드 1.3)\n"
+                f"`{SPEED_TRIGGER} [숫자]` : 속도 변경\n"
                 f"`{SPACE_TRIGGER}` : 띄어쓰기 모드\n"
                 f"`{NORMAL_TRIGGER}` : 일반쓰기 모드\n"
                 f"`{SPAM_TRIGGER} [문장]` : 입력한 문장 반복 도배\n"
-                f"`{MENTION_TRIGGER} @유저` : 해당 유저의 DM으로 지랄 도배\n"
-                f"`{DOBAE_TRIGGER} @유저` : 현재 채널에 도배(짤+텍스트)\n"
-                f"`{PING_TRIGGER} [문장]` : 문장 보냈다가 1초 뒤 삭제"
+                f"`{MENTION_TRIGGER} @유저` : DM으로 지랄 도배\n"
+                f"`{DOBAE_TRIGGER} @유저` : 채널에 도배(짤+텍스트)\n"
+                f"`{PING_TRIGGER} [문장]` : 문장 보냈다 지우기 무한 반복"
             )
             await message.channel.send(help_text)
             return
@@ -256,7 +263,7 @@ class SpamClient(discord.Client):
             try:
                 dm_channel = await target_user.create_dm()
             except Exception:
-                await message.channel.send("DM을 보낼 수 없습니다. (상대방이 DM을 막았거나 친구가 아님)")
+                await message.channel.send("DM을 보낼 수 없습니다.")
                 self.is_spamming = False
                 return
 
@@ -299,9 +306,6 @@ class SpamClient(discord.Client):
                 except Exception:
                     await asyncio.sleep(1)
 
-# ==========================================
-# 봇 실행
-# ==========================================
 def run_bot(token):
     client = SpamClient()
     client.run(token)
