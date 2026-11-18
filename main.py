@@ -33,7 +33,7 @@ if not TOKEN:
     exit(1)
 
 # ★ 니 부계 디스코드 ID ★
-OWNER_ID = 123456789012345678 
+OWNER_ID = 1568590045286244358 
 
 # 명령어
 START_TRIGGER = "!장애타"
