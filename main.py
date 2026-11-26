@@ -8,7 +8,7 @@ import time
 # ==========================================
 # ★ 니 부계 토큰들을 여기에 넣어라 (콤마로 구분) ★
 # ==========================================
-TOKENS = [    "MTU2ODU4ODYxMDAyODk2NTkxMA.GSthFR.NzQOwTCHNOvtSyCSBDdPeDEx0MIFJ_YEVsOfnw"]
+T
 
 # ★ 니 디스코드 ID ★
 OWNER_ID = 1568590045286244358
