@@ -4,6 +4,29 @@ import asyncio
 import os
 import threading
 import time
+from flask import Flask
+
+# ==========================================
+# Render가 봇을 재우지 않게 만드는 가짜 웹사이트
+# ==========================================
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "봇 살아있음 ㅋㅋ"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = threading.Thread(target=run)
+    t.daemon = True
+    t.start()
+
+# ==========================================
+# ★ 니 부계 토큰을 여기에 넣어라 (큰따옴표 안에) ★
+# ==========================================
+TOKEN = "여기에_니_부계_토큰_붙여넣기" 
 
 # ★ 니 디스코드 ID ★
 OWNER_ID = 1568590045286244358
@@ -234,17 +257,7 @@ class SpamClient(discord.Client):
                 except Exception: await asyncio.sleep(1)
             return
 
-# ==========================================
-# 토큰들을 2초 간격으로 순차 실행 (IP 차단 방지)
-# ==========================================
-def run_bot(token):
+if __name__ == "__main__":
+    keep_alive()
     client = SpamClient()
-    client.run(token)
-
-for token in TOKENS:
-    threading.Thread(target=run_bot, args=(token,), daemon=True).start()
-    time.sleep(2) # 토큰 하나당 2초 대기
-
-# 봇들이 꺼지지 않게 무한 대기
-while True:
-    time.sleep(1)
+    client.run(TOKEN)
